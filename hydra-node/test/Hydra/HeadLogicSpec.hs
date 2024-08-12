@@ -123,6 +123,28 @@ spec =
             getState
         getConfirmedSnapshot snapshotConfirmed `shouldBe` Just snapshot1
 
+      describe "ReqSn" $ do
+        it "prunes local txs in order" $ do
+          -- Given a list of transactions each depending on the previous. If a
+          -- prefix gets snapshotted, the suffix still stays in the local txs.
+          let tx1 = SimpleTx 1 mempty (utxoRef 2) -- No inputs, requires no specific starting state
+              tx2 = SimpleTx 2 (utxoRef 2) (utxoRef 3)
+              tx3 = SimpleTx 3 (utxoRef 3) (utxoRef 4)
+              s0 = inOpenState threeParties
+
+          -- XXX: this is hiding unxpected 'Error' outcomes
+          s <- runHeadLogic bobEnv ledger s0 $ do
+            step $ receiveMessage $ ReqTx tx1
+            step $ receiveMessage $ ReqTx tx2
+            step $ receiveMessage $ ReqTx tx3
+            step $ receiveMessage $ ReqSn 0 1 [1] Nothing
+            getState
+
+          case s of
+            (Open OpenState{coordinatedHeadState = CoordinatedHeadState{localTxs}}) -> do
+              localTxs `shouldBe` [tx2, tx3]
+            _ -> fail "expected Open state"
+
       describe "Tracks Transaction Ids" $ do
         it "keeps transactions in allTxs given it receives a ReqTx" $ do
           let s0 = inOpenState threeParties
@@ -239,7 +261,7 @@ spec =
             Error (RequireFailed SnapshotAlreadySigned{receivedSignature}) -> receivedSignature == carol
             _ -> False
 
-      it "waits if we receive a snapshot with transaction not applicable on previous snapshot" $ do
+      it "rejects snapshot request with transaction not applicable to previous snapshot" $ do
         let reqTx42 = receiveMessage $ ReqTx (SimpleTx 42 mempty (utxoRef 1))
             reqTx1 = receiveMessage $ ReqTx (SimpleTx 1 (utxoRef 1) (utxoRef 2))
             input = receiveMessage $ ReqSn 1 [1]
