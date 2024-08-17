@@ -14,6 +14,8 @@ changes.
 
 - Add TLS support for the API server via `--tls-cert` and `--tls-key` command line options.
 
+- **HACK** Disable API server history and break network reliability to avoid growing memory too much.
+
 ## [0.17.0] - 2024-05-20
 
 - **BREAKING** Change `hydra-node` API `/commit` endpoint for committing from scripts [#1380](https://github.com/input-output-hk/hydra/pull/1380):
