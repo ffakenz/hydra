@@ -9,8 +9,6 @@ import Hydra.Prelude hiding (toList)
 import Cardano.Api.UTxO qualified as UTxO
 import Cardano.Crypto.DSIGN qualified as CC
 import Cardano.Crypto.Hash (hashToBytes)
-import Cardano.Ledger.BaseTypes qualified as Ledger
-import Cardano.Ledger.Credential qualified as Ledger
 import Cardano.Ledger.Shelley.UTxO qualified as Ledger
 import Codec.CBOR.Magic (uintegerFromBytes)
 import Data.ByteString qualified as BS
@@ -30,52 +28,16 @@ import Hydra.Tx.Party (Party (..))
 import Hydra.Tx.Recover (RecoverObservation)
 import PlutusTx.Builtins (fromBuiltin)
 import Test.Cardano.Ledger.Conway.Arbitrary ()
+import Test.Gen.Cardano.Api.Typed (genTxId, genTxOutUTxOContext)
 import Test.Hydra.Tx.Fixture qualified as Fixtures
 import Test.QuickCheck (listOf, oneof, scale, shrinkList, shrinkMapBy, suchThat, vector, vectorOf)
+import Test.QuickCheck.Hedgehog (hedgehog)
 
 -- * TxOut
 
 instance Arbitrary (TxOut CtxUTxO) where
-  arbitrary = genTxOut
+  arbitrary = hedgehog $ genTxOutUTxOContext shelleyBasedEra
   shrink txOut = fromLedgerTxOut <$> shrink (toLedgerTxOut txOut)
-
--- | Generate a 'Babbage' era 'TxOut', which may contain arbitrary assets
--- addressed to public keys and scripts, as well as datums.
---
--- NOTE: This generator does
---  * not produce byron addresses as most of the cardano ecosystem dropped support for that (including plutus),
---  * not produce reference scripts as they are not fully "visible" from plutus,
---  * replace stake pointers with null references as nobody uses that.
-genTxOut :: Gen (TxOut ctx)
-genTxOut =
-  (noRefScripts . noStakeRefPtr <$> gen)
-    `suchThat` notByronAddress
- where
-  gen =
-    modifyTxOutValue (<> (lovelaceToValue $ Coin 10_000_000))
-      <$> oneof
-        [ fromLedgerTxOut <$> arbitrary
-        , notMultiAsset . fromLedgerTxOut <$> arbitrary
-        ]
-
-  notMultiAsset =
-    modifyTxOutValue (lovelaceToValue . selectLovelace)
-
-  notByronAddress (TxOut addr _ _ _) = case addr of
-    ByronAddressInEra{} -> False
-    _ -> True
-
-  noStakeRefPtr out@(TxOut addr val dat refScript) = case addr of
-    ShelleyAddressInEra (ShelleyAddress _ cre sr) ->
-      case sr of
-        Ledger.StakeRefPtr _ ->
-          TxOut (ShelleyAddressInEra (ShelleyAddress Ledger.Testnet cre Ledger.StakeRefNull)) val dat refScript
-        _ ->
-          TxOut (ShelleyAddressInEra (ShelleyAddress Ledger.Testnet cre sr)) val dat refScript
-    _ -> out
-
-  noRefScripts out =
-    out{txOutReferenceScript = ReferenceScriptNone}
 
 -- | Generate a 'TxOut' with a byron address. This is usually not supported by
 -- Hydra or Plutus.
@@ -90,16 +52,6 @@ genTxOutAdaOnly :: VerificationKey PaymentKey -> Gen (TxOut ctx)
 genTxOutAdaOnly vk = do
   value <- lovelaceToValue . Coin <$> scale (* 8) arbitrary `suchThat` (> 0)
   pure $ TxOut (mkVkAddress (Testnet $ NetworkMagic 42) vk) value TxOutDatumNone ReferenceScriptNone
-
--- | Generate a 'TxOut' with a reference script. The standard 'genTxOut' is not
--- including reference scripts, use this generator if you are interested in
--- these cases.
-genTxOutWithReferenceScript :: Gen (TxOut ctx)
-genTxOutWithReferenceScript = do
-  -- Have the ledger generate a TxOut with a reference script as instances are
-  -- not so easily accessible.
-  refScript <- (txOutReferenceScript . fromLedgerTxOut <$> arbitrary) `suchThat` (/= ReferenceScriptNone)
-  genTxOut <&> \out -> out{txOutReferenceScript = refScript}
 
 -- * UTxO
 
@@ -135,7 +87,7 @@ genUTxOSized :: Int -> Gen UTxO
 genUTxOSized numUTxO =
   fold <$> vectorOf numUTxO (UTxO.singleton <$> gen)
  where
-  gen = (,) <$> arbitrary <*> genTxOut
+  gen = (,) <$> arbitrary <*> arbitrary
 
 -- | Genereate a 'UTxO' with a single entry using given 'TxOut' generator.
 genUTxO1 :: Gen (TxOut CtxUTxO) -> Gen UTxO
@@ -175,7 +127,7 @@ genUTxOWithSimplifiedAddresses :: Gen UTxO
 genUTxOWithSimplifiedAddresses =
   UTxO.fromPairs <$> listOf genEntry
  where
-  genEntry = (,) <$> genTxIn <*> genTxOut
+  genEntry = (,) <$> genTxIn <*> arbitrary
 
 -- * Others
 
@@ -235,9 +187,7 @@ instance Arbitrary (VerificationKey PaymentKey) where
   arbitrary = fst <$> genKeyPair
 
 instance Arbitrary TxId where
-  arbitrary = onlyTxId <$> arbitrary
-   where
-    onlyTxId (TxIn txi _) = txi
+  arbitrary = hedgehog genTxId
 
 genScriptRegistry :: Gen ScriptRegistry
 genScriptRegistry = do

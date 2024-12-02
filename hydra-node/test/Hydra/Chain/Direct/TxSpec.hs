@@ -62,7 +62,6 @@ import Test.Hydra.Tx.Fixture (
 import Test.Hydra.Tx.Fixture qualified as Fixture
 import Test.Hydra.Tx.Gen (
   genSigningKey,
-  genTxOutWithReferenceScript,
   genUTxO1,
   genUTxOAdaOnlyOfSize,
   genValue,
@@ -263,7 +262,7 @@ genBlueprintTxWithUTxO =
       )
 
   addSomeReferenceInputs (utxo, txbody) = do
-    txout <- genTxOutWithReferenceScript
+    txout <- arbitrary
     txin <- arbitrary
     pure (utxo <> UTxO.singleton (txin, txout), txbody & addReferenceInputs [txin])
 

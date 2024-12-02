@@ -72,7 +72,6 @@ import Test.Hydra.Tx.Fixture qualified as Fixture
 import Test.Hydra.Tx.Gen (
   genForParty,
   genScriptRegistry,
-  genTxOut,
   genUTxO1,
   genVerificationKey,
  )
@@ -604,7 +603,7 @@ realWorldModelUTxO =
  where
   gen = do
     lovelace <- arbitrary
-    genUTxO1 (modifyTxOutValue (const $ lovelaceToValue lovelace) <$> genTxOut)
+    genUTxO1 (modifyTxOutValue (const $ lovelaceToValue lovelace) <$> arbitrary)
 
 -- | A correctly signed snapshot. Given a snapshot number a snapshot signed by
 -- all participants (alice, bob and carol) with some UTxO contained is produced.

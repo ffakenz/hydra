@@ -121,7 +121,7 @@ import Hydra.Tx.Utils (dummyValidatorScript, splitUTxO)
 import PlutusLedgerApi.V3 qualified as Plutus
 import Test.Aeson.GenericSpecs (roundtripAndGoldenSpecs)
 import Test.Hydra.Tx.Fixture (slotLength, systemStart, testNetworkId)
-import Test.Hydra.Tx.Gen (genOutput, genTxOut, genTxOutAdaOnly, genTxOutByron, genUTxO1, genUTxOSized)
+import Test.Hydra.Tx.Gen (genOutput, genTxOutAdaOnly, genTxOutByron, genUTxO1, genUTxOSized)
 import Test.Hydra.Tx.Mutation (
   Mutation (..),
   applyMutation,
@@ -432,7 +432,7 @@ genCommitTxMutation utxo tx =
 genAdaOnlyUTxOOnMainnetWithAmountBiggerThanOutLimit :: Gen UTxO
 genAdaOnlyUTxOOnMainnetWithAmountBiggerThanOutLimit = do
   adaAmount <- (+ maxMainnetLovelace) . getPositive <$> arbitrary
-  genUTxO1 (modifyTxOutValue (const $ lovelaceToValue adaAmount) <$> genTxOut)
+  genUTxO1 (modifyTxOutValue (const $ lovelaceToValue adaAmount) <$> arbitrary)
 
 -- * Properties
 

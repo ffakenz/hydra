@@ -13,6 +13,8 @@ import Hydra.API.HTTPServer (DraftCommitTxRequest (..), DraftCommitTxResponse (.
 import Hydra.API.ServerOutput (CommitInfo (CannotCommit, NormalCommit))
 import Hydra.API.ServerSpec (dummyChainHandle)
 import Hydra.Cardano.Api (
+  CtxUTxO,
+  TxOut,
   mkTxOutDatumInline,
   modifyTxOutDatum,
   renderTxIn,
@@ -31,7 +33,6 @@ import Test.Hspec.Wai (MatchBody (..), ResponseMatcher (matchBody), get, post, s
 import Test.Hspec.Wai.Internal (withApplication)
 import Test.Hydra.Node.Fixture (testEnvironment)
 import Test.Hydra.Tx.Fixture (defaultPParams)
-import Test.Hydra.Tx.Gen (genTxOut)
 import Test.QuickCheck (
   checkCoverage,
   counterexample,
@@ -198,7 +199,7 @@ apiServerSpec = do
                   }
 
       prop "has inlineDatumRaw" $ \i ->
-        forAll genTxOut $ \o -> do
+        forAll (arbitrary :: Gen (TxOut CtxUTxO)) $ \o -> do
           let o' = modifyTxOutDatum (const $ mkTxOutDatumInline (123 :: Integer)) o
           let getUTxO = pure $ Just $ UTxO.fromPairs [(i, o')]
           withApplication (httpApp @Tx nullTracer dummyChainHandle testEnvironment defaultPParams cantCommit getUTxO getPendingDeposits putClientInput) $ do
